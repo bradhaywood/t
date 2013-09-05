@@ -8,13 +8,15 @@ import (
 type Tasks struct {
     Id int
     Desc string
-    Started string 
+    Started string
 }
 
 type Task struct {
     File string
+    FileHandle os.File
     Tasks []Tasks
     LastError error
+    NextId int
 }
 
 func main() {
@@ -24,7 +26,8 @@ func main() {
         // check to make sure our config exists
         if _, err := os.Stat(file); os.IsNotExist(err) { 
             fmt.Print("(!) No config found. Creating one for you now... ")
-            if createConfig(file) {
+            if fh, ok := createConfig(file); ok {
+                Task{FileHandle: fh}
                 fmt.Println("OK, done. You're welcome")
             } else {
                 fmt.Fprintf(os.Stderr, "We had trouble creating config. Bailing\n")
@@ -33,9 +36,9 @@ func main() {
         }
         
         t := Task{File: file}
-        if t.parseOptions() {
-            fmt.Println("Parsed fine!")
-        } else {
+        t.init()
+
+        if ! t.parseOptions() {
             fmt.Fprintf(os.Stderr, "Usage: %s %s\n", usage, os.Args[0])
             os.Exit(3)
         }
@@ -45,30 +48,44 @@ func main() {
     }
 }
 
-func (t *Task) parseOptions() bool {
-    var flag string
-    var i int = 0
-    // remove the file form the start of the array
-    args := append(os.Args[:0], os.Args[0+1:]...)
-    for {
-        i += 1
-        // bail if we exceed the index max
-        if i > len(args) { break }
-        args = append(args[:0], args[i+0:]...)
-        flag = args[0]
-        switch(flag) {
-            case "-l":
-                fmt.Println("Listing tasks")
+// function to initialise anything we might need
+// like to grab the next available ID from our file
+// or initialise Tasks and add them into the Task struct
+func (t *Task) init() {
+    //scanner := bufio.NewScanner(t.File)
+}
 
-            case "-a":
-                fmt.Println("Add a task")
-        }
+func (t *Task) parseOptions() bool {
+    var err error
+    // remove the file from the start of the array
+    args := append(os.Args[:0], os.Args[0+1:]...)
+    
+    // get the command
+    switch(args[0]) {
+        case "list":
+            fmt.Println("Listing tasks")
+        case "add":
+            if t.addTask(args); err == nil {
+                fmt.Println("Added task")
+                return true
+            } else {
+                return false
+            }
     }
+
+    return true
+}
+
+func (t *Task) addTask(args []string) bool {
+    if len(args) != 2 {
+        return false
+    }
+
     
     return true
 }
 
-func createConfig(f string) bool {
+func createConfig(f string) (file, bool) {
     fo, err := os.Create(f)
     if err != nil { panic(err) }
 
@@ -78,6 +95,6 @@ func createConfig(f string) bool {
             panic(err)
         }
     }()
-
-    return true
+   
+    return *fo, true
 }
